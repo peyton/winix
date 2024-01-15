@@ -192,16 +192,17 @@ class WinixDeviceWrapper:
             await self._driver.plasmawave_off()
 
     async def async_manual(self) -> None:
-        """Put the purifier in Manual mode with Low airflow. Plasma state is left unchanged."""
+        """Put the purifier in Manual mode, disabling Sleep airflow if necessary. Plasma state is left unchanged."""
 
         if not self._manual:
             self._manual = True
             self._auto = False
             self._sleep = False
             self._state[ATTR_MODE] = MODE_MANUAL
-            self._state[
-                ATTR_AIRFLOW
-            ] = AIRFLOW_LOW  # Something other than AIRFLOW_SLEEP
+            if self._state[ATTR_AIRFLOW] == AIRFLOW_SLEEP:
+                self._state[
+                    ATTR_AIRFLOW
+                ] = AIRFLOW_LOW  # Something other than AIRFLOW_SLEEP
 
             self._logger.debug("%s => set mode=manual", self._alias)
             await self._driver.manual()
@@ -222,12 +223,12 @@ class WinixDeviceWrapper:
     async def async_set_speed(self, speed) -> None:
         """Turn the purifier on, put it in Manual mode and set the speed."""
 
+        # Setting speed requires the fan to be in manual mode
+        await self.async_ensure_on()
+        await self.async_manual()
+
         if self._state.get(ATTR_AIRFLOW) != speed:
             self._state[ATTR_AIRFLOW] = speed
-
-            # Setting speed requires the fan to be in manual mode
-            await self.async_ensure_on()
-            await self.async_manual()
 
             self._logger.debug("%s => set speed=%s", self._alias, speed)
             await getattr(self._driver, speed)()
